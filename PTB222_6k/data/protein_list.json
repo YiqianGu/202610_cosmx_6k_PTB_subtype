@@ -1,0 +1,12 @@
+{
+  "Mean.PanCK": "Mean.PanCK.json",
+  "Max.PanCK": "Max.PanCK.json",
+  "Mean.Membrane": "Mean.Membrane.json",
+  "Max.Membrane": "Max.Membrane.json",
+  "Mean.CD45": "Mean.CD45.json",
+  "Max.CD45": "Max.CD45.json",
+  "Mean.DAPI": "Mean.DAPI.json",
+  "Max.DAPI": "Max.DAPI.json",
+  "Mean.CD68": "Mean.CD68.json",
+  "Max.CD68": "Max.CD68.json"
+}
