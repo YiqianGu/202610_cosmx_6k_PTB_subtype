@@ -1,34 +1,46 @@
 <!doctype html><html><head><meta charset="utf-8">
-<title>PTB CosMx 6K — subtype viewer</title>
-<style>body{font-family:system-ui,sans-serif;margin:40px;background:#0f1116;color:#e6e6e6}
-h1{font-weight:600;margin-bottom:4px}.sub{color:#9aa4b2;margin-top:0}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:24px;max-width:900px}
-.card{display:block;padding:20px;background:#1b1f2a;border:1px solid #2a2f3a;border-radius:12px;text-decoration:none;color:#e6e6e6;transition:.15s}
-.card:hover{border-color:#4E9AF1;transform:translateY(-2px)}.card h2{margin:0 0 8px;font-size:1.1rem}
-.card p{margin:0;color:#9aa4b2;font-size:.9rem}
-.note{margin-top:32px;padding:16px 20px;background:#1b1f2a;border-left:3px solid #E64B35;border-radius:6px;max-width:900px;color:#c9d1d9;font-size:.9rem;line-height:1.55}
-.note b{color:#e6e6e6}code{background:#0f1116;padding:1px 5px;border-radius:4px}</style></head>
-<body><h1>PTB CosMx 6K — subtype viewer</h1>
-<p class="sub">Two specimens, 645,761 cells, 6,175-gene panel. Labels transferred from the
-202610 combined snRNA reference in two rounds: 10 major types, then 60 subtypes within lineage.</p>
-<div class="grid">
-<a class="card" href="PTB243_6k/index.html"><h2>PTB 24.3</h2><p>436,574 cells &middot; 11 annotation layers &middot; 300 genes &middot; 10 IF channels</p></a>
-<a class="card" href="PTB222_6k/index.html"><h2>PTB 22.2</h2><p>209,187 cells &middot; 11 annotation layers &middot; 300 genes &middot; 10 IF channels</p></a>
-</div>
-<div class="note"><b>What to click.</b> The <code>Annotation Layer</code> dropdown switches between
-major type, all 60 subtypes, one layer per lineage (so no legend exceeds 13 rows), transfer
-confidence, and an <b>Activation</b> layer holding just the two populations of interest.
-Each legend row has a colour picker — your choices persist in the browser — and a
-<code>genes</code> button listing that label&rsquo;s <b>top 20 marker genes</b>; click a gene to
-colour cells by its expression. The <span style="color:#ffd54f">&#9678;</span> button rings
-those cells, or paste cell IDs into the highlight box.
-<br><br><b>Read these caveats before quoting anything.</b>
-The two slides are <b>different specimens on different panel builds and different
-segmentations</b> (median cell area differs by 31%), so a difference in composition
-<i>between</i> them is not interpretable as biology. CD3 immunofluorescence exists only on
-PTB 24.3 and CD68 only on PTB 22.2; CD45 is on both. <code>Proliferating</code> is a single-subtype
-label that the prior run showed absorbs T cells, so treat it with suspicion rather than as a
-proliferation measure. <code>PTB antigen-activated T</code> comes from only 112 reference cells
-(1.5% of the reference&rsquo;s T cells), which is why the reported percentage is a bound rather
-than a point estimate.</div>
-</body></html>
+    <title>PTB CosMx 6K — subtype viewer</title>
+    <style>body{font-family:system-ui,sans-serif;margin:40px;background:#0f1116;color:#e6e6e6}
+    h1{font-weight:600;margin-bottom:4px}.sub{color:#9aa4b2;margin-top:0}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:24px;max-width:900px}
+    .card{display:block;padding:20px;background:#1b1f2a;border:1px solid #2a2f3a;border-radius:12px;text-decoration:none;color:#e6e6e6;transition:.15s}
+    .card:hover{border-color:#4E9AF1;transform:translateY(-2px)}.card h2{margin:0 0 8px;font-size:1.1rem}
+    .card p{margin:0;color:#9aa4b2;font-size:.9rem}
+    .note{margin-top:32px;padding:16px 20px;background:#1b1f2a;border-left:3px solid #E64B35;border-radius:6px;max-width:900px;color:#c9d1d9;font-size:.9rem;line-height:1.55}
+    .note b{color:#e6e6e6}code{background:#0f1116;padding:1px 5px;border-radius:4px}</style></head>
+    <body><h1>PTB CosMx 6K — subtype viewer</h1>
+    <p class="sub">Two specimens, 645,761 cells, 6,175-gene panel. Labels transferred from the
+    202610 combined snRNA reference in two rounds: 10 major types, then 60 subtypes within lineage.</p>
+    <div class="grid">
+    <a class="card" href="PTB243_6k/index.html"><h2>PTB 24.3</h2><p>436,574 cells &middot; 4 annotation layers &middot; 300 genes &middot; 10 IF channels</p></a>
+<a class="card" href="PTB222_6k/index.html"><h2>PTB 22.2</h2><p>209,187 cells &middot; 4 annotation layers &middot; 300 genes &middot; 10 IF channels</p></a>
+    </div>
+    <div class="note"><b>What to click.</b> The <code>Cell type</code> layer opens on the 10 major
+    types. Click the <code>&#9656;</code> chevron on a row to expand that major into its subtypes and
+    leave the others collapsed &mdash; so you can show <i>TREM2&#8314; macrophages</i> at subtype level
+    beside <i>Fibroblast</i> at major level, in one view. <code>Expand all</code> /
+    <code>Collapse all</code> do every row at once. The dropdown also holds <b>Activation</b> (just
+    the two populations of interest), transfer confidence, and sample.
+    Each legend row has a colour picker — your choices persist in the browser — and a
+    <code>genes</code> button listing that label&rsquo;s <b>top 20 marker genes</b>; click a gene to
+    colour cells by its expression. The <span style="color:#ffd54f">&#9678;</span> button rings
+    those cells, or paste cell IDs into the highlight box.
+    <br><br><b>Read these caveats before quoting anything.</b>
+    The two slides are <b>different specimens on different panel builds and different
+    segmentations</b> (median cell area differs by 31%), so a difference in composition
+    <i>between</i> them is not interpretable as biology. CD3 immunofluorescence exists only on
+    PTB 24.3 and CD68 only on PTB 22.2; CD45 is on both. <code>Proliferating</code> is a single-subtype
+    label that the prior run showed absorbs T cells, so treat it with suspicion rather than as a
+    proliferation measure. <code>PTB antigen-activated T</code> comes from only 112 reference cells
+    (1.5% of the reference&rsquo;s T cells), which is why the reported percentage is a bound rather
+    than a point estimate.
+    <br><br><b>The <code>- V2</code> row is not a cell type.</b> It is A02&rsquo;s re-application of an
+    archived rule intersecting the top 20% of cells on three gene modules and &mdash; on PTB&nbsp;24.3
+    only &mdash; CD3 protein. Measured on this data its largest group is <b>fibroblast (~28%)</b>,
+    not T cell, and it agrees with the transferred label at about <b>1% precision</b> (8&ndash;9&times;
+    over chance). Its own author concluded it is &ldquo;not a usable per-cell classifier&rdquo;.
+    PTB&nbsp;22.2 has no CD3 channel, so its V2 call uses three criteria instead of four and falls
+    <i>below</i> chance &mdash; the two slides&rsquo; V2 numbers are not comparable. The round-2
+    <code>subtype</code> call is untouched and remains the annotation of record; hover any cell to
+    see both.</div>
+    </body></html>

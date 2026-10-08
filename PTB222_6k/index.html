@@ -38,6 +38,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .ct-row {
   display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 4px; cursor: pointer; font-size: 13px;
 }
+.ct-ex { width: 13px; flex-shrink: 0; background: none; border: none; color: #8892a8;
+         font-size: 10px; line-height: 1; cursor: pointer; padding: 0; font-family: inherit; }
+.ct-ex:hover { color: #e6e6e6; }
+.ct-ex-leaf { visibility: hidden; cursor: default; }
+.ct-row[data-level="leaf"] { padding-left: 15px; }
+.ct-row[data-level="parent"] .ct-name { font-weight: 600; }
 .ct-row:hover { background: rgba(255,255,255,0.05); }
 /* Individual transcript rows — same metrics as .ct-row, tighter and monospaced */
 .tx-group {
@@ -374,6 +380,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         <div class="bulk-actions">
           <button class="bulk-btn" onclick="toggleAll(true)">Select All</button>
           <button class="bulk-btn" onclick="toggleAll(false)">Deselect All</button>
+<button class="btn" id="btn-expand-all" onclick="setAllExpanded(true)">Expand all</button>
+<button class="btn" id="btn-collapse-all" onclick="setAllExpanded(false)">Collapse all</button>
         </div>
         <div id="celltype-list"></div>
       </div>
@@ -572,13 +580,19 @@ let currentProtein = null; // name of active protein or null
 const NO_CACHE = { cache: 'no-cache' };
 
 async function init() {
-  setLoadingText('Loading cell positions...');
-  const cellsResp = await fetch('data/cells.json');
-  cellData = await cellsResp.json();
-
+  // Metadata FIRST, so cells.json can be fetched with its payload version.
+  // cells.json is deliberately NOT no-cache (it is the big file), so without
+  // this a reader with a warm cache gets a new index.html + new metadata.json
+  // and a STALE cells.json whose declared layer does not exist -- which this
+  // viewer has already shipped once as a blank page.
   setLoadingText('Loading metadata...');
   const metaResp = await fetch('data/metadata.json', NO_CACHE);
   metadata = await metaResp.json();
+
+  setLoadingText('Loading cell positions...');
+  const pv = metadata.payload_version ? ('?v=' + metadata.payload_version) : '';
+  const cellsResp = await fetch('data/cells.json' + pv);
+  cellData = await cellsResp.json();
 
   resolveAnnotationKey();
 
@@ -692,7 +706,7 @@ function loadColorPreferences() {
     if (savedObj[ct]) {
       celltypeColors[ct] = savedObj[ct];
     } else {
-      celltypeColors[ct] = DEFAULT_PALETTE[i % DEFAULT_PALETTE.length];
+      celltypeColors[ct] = defaultColorFor(ct);
     }
     celltypeVisible[ct] = true;
   });
@@ -828,14 +842,144 @@ function resolveAnnotationKey() {
     if (declared) console.warn(`celltype_col "${declared}" is not a usable layer; using "${usable[0]}".`);
   } else if (Array.isArray(cellData.celltype)) { currentAnnotation = 'celltype'; }
   else { throw new Error('cells.json carries no usable annotation array; re-run the export.'); }
+  if (metadata && metadata.schema >= 2 && declared && !Array.isArray(cellData[declared])) {
+    throw new Error('cells.json has no "' + declared + '" array but metadata declares it (schema '
+      + metadata.schema + '). The payload is stale -- hard-reload, or re-run 08_viewer.R.');
+  }
   DEFAULT_ANNOTATION = currentAnnotation;
+  hierInit();
   // metadata.cell_types must agree with the chosen layer; switchAnnotation() does this
   // on every later change, so do it once here for the initial layer too.
   const a = metadata.annotations && metadata.annotations[currentAnnotation];
   if (a && a.cell_types) { metadata.cell_types = a.cell_types; metadata.n_celltypes = a.n_celltypes; }
+  rebuildDerived();
 }
 
 let DEFAULT_ANNOTATION = 'celltype';
+
+// ---- Hierarchical "Cell type" layer -------------------------------------
+// The exported `cell_type` layer is a FLAT leaf vector (subtypes, plus A02's
+// V2 label) carrying a parent map. The hierarchy is computed in the browser:
+// on expand/collapse we rewrite cellData.cell_type and that layer's
+// cell_types IN PLACE from the stashed leaf codes. Doing it that way means
+// getCelltype, rebuildColors, rebuildHighlightIdx, buildCelltypeUI's
+// histogram, getTooltipInfo, updateSelectionSummary, toggleAll and
+// resolveAnnotationKey's Array.isArray() gate all keep working untouched --
+// a virtual key resolved only inside getCelltype() would leave
+// buildCelltypeUI reading `undefined` and throw, which is the exact failure
+// this viewer already shipped once.
+let hierKey = null;        // which layer is hierarchical ('cell_type')
+let hierLeafCodes = null;  // Int32Array: cell -> leaf index (immutable)
+let hierLeafLevels = null; // leaf label strings (immutable)
+let hierParents = null;    // major label strings, export order
+let hierParentOf = null;   // leaf index -> parent index
+let hierExpanded = new Set();
+let lastViewState = null;
+
+function hierInfo() {
+  if (!hierKey || !metadata.annotations) return null;
+  const a = metadata.annotations[hierKey];
+  return (a && a.parents && a.parent_of) ? a : null;
+}
+
+// Stash the immutable leaf arrays once, before anything reads the layer.
+function hierInit() {
+  hierKey = null;
+  const anns = (metadata && metadata.annotations) ? metadata.annotations : {};
+  for (const k of Object.keys(anns)) {
+    if (anns[k].parents && anns[k].parent_of && Array.isArray(cellData[k])) { hierKey = k; break; }
+  }
+  if (!hierKey) return;
+  const a = anns[hierKey];
+  hierLeafLevels = a.cell_types.slice();
+  hierParents = a.parents.slice();
+  hierParentOf = Int32Array.from(a.parent_of);
+  hierLeafCodes = Int32Array.from(cellData[hierKey]);
+  hierExpanded = new Set();
+}
+
+// Rewrite the active hierarchical layer for the current expansion set.
+function rebuildDerived() {
+  if (!hierInfo() || currentAnnotation !== hierKey) return;
+  const leafToRow = new Int32Array(hierLeafLevels.length).fill(-1);
+  const levels = [];
+  hierParents.forEach((pname, pi) => {
+    const kids = [];
+    for (let l = 0; l < hierParentOf.length; l++) if (hierParentOf[l] === pi) kids.push(l);
+    // A single-subtype lineage's leaf IS its major, so expanding it is a no-op.
+    if (hierExpanded.has(pname) && kids.length > 1) {
+      kids.forEach(l => { leafToRow[l] = levels.length; levels.push(hierLeafLevels[l]); });
+    } else {
+      const r = levels.length; levels.push(pname);
+      kids.forEach(l => { leafToRow[l] = r; });
+    }
+  });
+  const N = hierLeafCodes.length;
+  const out = new Int32Array(N);
+  for (let i = 0; i < N; i++) {
+    const c = hierLeafCodes[i];
+    out[i] = (c >= 0 && c < leafToRow.length) ? leafToRow[c] : -1;
+  }
+  cellData[hierKey] = out;
+  metadata.annotations[hierKey].cell_types = levels;
+  metadata.annotations[hierKey].n_celltypes = levels.length;
+  metadata.cell_types = levels;
+  metadata.n_celltypes = levels.length;
+}
+
+function hierParentNameOf(label) {
+  if (!hierInfo()) return null;
+  const li = hierLeafLevels.indexOf(label);
+  return li < 0 ? null : hierParents[hierParentOf[li]];
+}
+function hierChildCount(label) {
+  if (!hierInfo()) return 0;
+  const pi = hierParents.indexOf(label);
+  if (pi < 0) return 0;
+  let n = 0;
+  for (let l = 0; l < hierParentOf.length; l++) if (hierParentOf[l] === pi) n++;
+  return n;
+}
+function hierIsParentRow(label) { return hierInfo() ? hierParents.indexOf(label) >= 0 : false; }
+
+// Default colours key off a FROZEN index (parents, then leaves) rather than the
+// row's position in the displayed list -- otherwise expanding one major silently
+// recolours every untouched row below it.
+function defaultColorFor(ct) {
+  let k = -1;
+  if (hierInfo()) {
+    k = hierParents.indexOf(ct);
+    if (k < 0) { const li = hierLeafLevels.indexOf(ct); if (li >= 0) k = hierParents.length + li; }
+  }
+  if (k < 0) k = annLevels(currentAnnotation).indexOf(ct);
+  return DEFAULT_PALETTE[(k < 0 ? 0 : k) % DEFAULT_PALETTE.length];
+}
+
+// Expand or collapse one major. A strict subset of switchAnnotation()'s work:
+// it must NOT reset colours or visibility, and new child rows inherit the
+// parent's visibility so expanding a hidden major does not un-hide 13 rows.
+function setExpanded(pname, on) {
+  if (!hierInfo()) return;
+  if (on) hierExpanded.add(pname); else hierExpanded.delete(pname);
+  const parentVis = celltypeVisible[pname];
+  rebuildDerived();
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem('spatial_viewer_colors') || '{}'); } catch (e) { saved = {}; }
+  metadata.cell_types.forEach(ct => {
+    if (celltypeColors[ct] === undefined) celltypeColors[ct] = saved[ct] || defaultColorFor(ct);
+    if (celltypeVisible[ct] === undefined) celltypeVisible[ct] = (parentVis !== false);
+  });
+  buildCelltypeUI();
+  rebuildHighlightIdx();
+  updateSelectionSummary();
+  updateLayer();
+  updateHash(lastViewState);
+}
+function setAllExpanded(on) {
+  if (!hierInfo()) return;
+  hierExpanded = on ? new Set(hierParents.filter(p => hierChildCount(p) > 1)) : new Set();
+  setExpanded('', false);
+}
 
 function annLevels(key) {
   const a = metadata.annotations && metadata.annotations[key];
@@ -993,13 +1137,17 @@ function switchAnnotation(key) {
     metadata.cell_types = metadata.annotations[key].cell_types;
     metadata.n_celltypes = metadata.annotations[key].n_celltypes;
   }
+  // Collapse to majors on every layer change, and rebuild BEFORE the colour
+  // init below reads metadata.cell_types.
+  hierExpanded = new Set();
+  rebuildDerived();
   // Re-initialize colors for new cell types
   const saved = localStorage.getItem('spatial_viewer_colors');
   const savedObj = saved ? JSON.parse(saved) : {};
   celltypeColors = {};
   celltypeVisible = {};
   metadata.cell_types.forEach((ct, i) => {
-    celltypeColors[ct] = savedObj[ct] || DEFAULT_PALETTE[i % DEFAULT_PALETTE.length];
+    celltypeColors[ct] = savedObj[ct] || defaultColorFor(ct);
     celltypeVisible[ct] = true;
   });
   // Rebuild UI and re-render
@@ -1038,6 +1186,7 @@ function initDeck() {
     layers: createLayers(),
     getTooltip: getTooltipInfo,
     onViewStateChange: ({viewState}) => {
+      lastViewState = viewState;
       updateHash(viewState);
     },
     onAfterRender: () => {
@@ -1277,6 +1426,14 @@ function getTooltipInfo({index, object}) {
 
   let html = `<div class="tt-label">Cell ID</div><div class="tt-value">${cellData.cell_id[cellIdx]}</div>`;
   html += `<div class="tt-label">Cell Type</div><div class="tt-value">${ct}</div>`;
+  const hp = hierParentNameOf(ct);
+  if (hp && hp !== ct) html += `<div class="tt-label">Major</div><div class="tt-value">${hp}</div>`;
+  // The round-2 call for this cell, so a V2 row can be read against it without
+  // leaving the viewer. cellData.subtype is a tooltip-only array (not a layer).
+  if (hierInfo() && Array.isArray(cellData.subtype)) {
+    const sv = hierLeafLevels[cellData.subtype[cellIdx]];
+    if (sv && sv !== ct) html += `<div class="tt-label">Round-2 subtype</div><div class="tt-value">${sv}</div>`;
+  }
 
   const ann = getAnnotation(ct);
   if (ann) {
@@ -1343,6 +1500,20 @@ function buildCelltypeUI() {
     const row = createCelltypeRow(ct, counts[ct] || 0);
     listEl.appendChild(row);
     listExprEl.appendChild(row.cloneNode(true));
+  });
+
+  // The chevron is bound ONCE per container by delegation, not per row. The
+  // clone path below re-binds only three controls and already drops .ct-mk and
+  // the label click; adding a fourth thing to it is how that bug grows.
+  [listEl, listExprEl].forEach(host => {
+    if (host.dataset.exBound) return;
+    host.dataset.exBound = '1';
+    host.addEventListener('click', e => {
+      const b = e.target.closest('.ct-ex');
+      if (!b || !b.dataset.expand) return;
+      e.stopPropagation();
+      setExpanded(b.dataset.expand, !hierExpanded.has(b.dataset.expand));
+    });
   });
 
   // Re-attach events for cloned nodes in expr list
@@ -1430,6 +1601,20 @@ function createCelltypeRow(ct, count) {
   const row = document.createElement('div');
   row.className = 'ct-row';
   row.dataset.celltype = ct;
+
+  // Expander. A single-subtype lineage's leaf IS its major, so expanding it
+  // would redraw the same row -- no chevron there (the exporter skips those
+  // lineages for the same reason).
+  const isP = hierIsParentRow(ct), kids = hierChildCount(ct);
+  row.dataset.level = hierInfo() ? (isP ? 'parent' : 'leaf') : 'flat';
+  const ex = document.createElement('button');
+  ex.className = 'ct-ex' + ((isP && kids > 1) ? '' : ' ct-ex-leaf');
+  if (isP && kids > 1) {
+    ex.textContent = hierExpanded.has(ct) ? '\u25BE' : '\u25B8';
+    ex.dataset.expand = ct;
+    ex.title = (hierExpanded.has(ct) ? 'Collapse ' : 'Expand ') + ct + ' (' + kids + ' subtypes)';
+  } else { ex.disabled = true; }
+  row.appendChild(ex);
 
   const cb = document.createElement('input');
   cb.type = 'checkbox';
@@ -1909,6 +2094,8 @@ function updateHash(viewState) {
   // Pasted cell-ID sets are deliberately NOT serialised — they can run to
   // thousands of IDs and would blow the URL length.
   if (currentAnnotation !== DEFAULT_ANNOTATION) params.set('ann', currentAnnotation);
+  // Which majors are expanded, so a shared link reproduces a MIXED view.
+  if (hierExpanded.size) params.set('ex', Array.from(hierExpanded).join('~'));
   const hlKeys = Object.keys(highlightLabels);
   if (hlKeys.length) {
     params.set('hl', hlKeys.join('~'));
@@ -1932,6 +2119,23 @@ function restoreFromHash() {
     const sel = document.getElementById('annotation-select');
     if (sel) sel.value = params.get('ann');
     switchAnnotation(params.get('ann'));
+  }
+  // Expansion must be restored AFTER the `ann` branch above (switchAnnotation
+  // clears it) and BEFORE `hl` below: a shared link whose highlight is a
+  // subtype needs that subtype's row to exist first.
+  if (params.has('ex') && hierInfo()) {
+    const ok = new Set(hierParents);
+    params.get('ex').split('~').filter(x => ok.has(x)).forEach(x => hierExpanded.add(x));
+    if (hierExpanded.size) {
+      rebuildDerived();
+      let saved = {};
+      try { saved = JSON.parse(localStorage.getItem('spatial_viewer_colors') || '{}'); } catch (e) { saved = {}; }
+      metadata.cell_types.forEach(ct => {
+        if (celltypeColors[ct] === undefined) celltypeColors[ct] = saved[ct] || defaultColorFor(ct);
+        if (celltypeVisible[ct] === undefined) celltypeVisible[ct] = true;
+      });
+      buildCelltypeUI(); updateSelectionSummary(); updateLayer();
+    }
   }
   if (params.has('hls')) {
     highlightScale = Number(params.get('hls')) || 3;
