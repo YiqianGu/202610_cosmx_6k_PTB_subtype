@@ -446,7 +446,13 @@ let cellData = null;       // {x:[], y:[], celltype:[], celltype_rescued:[], cel
 let metadata = null;       // {dataset_name, n_cells, cell_types, bounds, annotations, ...}
 let geneList = null;       // {geneName: filename, ...}
 let currentMode = 'celltype';
-let currentAnnotation = 'celltype'; // which celltype array to use
+// Which annotation array is active. Resolved from metadata.celltype_col once metadata
+// loads -- NOT hardcoded. The archived export duplicated its primary column under the
+// extra key 'celltype'; this one does not, and hardcoding that name made
+// cellData[currentAnnotation] undefined and threw
+//   "Cannot read properties of undefined (reading '0')"
+// on the first getCelltype() call, before anything rendered.
+let currentAnnotation = 'celltype';   // placeholder; set by resolveAnnotationKey()
 let currentGene = null;
 let currentGeneExpr = null;
 let celltypeVisible = {};  // {typeName: bool}
@@ -573,6 +579,8 @@ async function init() {
   setLoadingText('Loading metadata...');
   const metaResp = await fetch('data/metadata.json', NO_CACHE);
   metadata = await metaResp.json();
+
+  resolveAnnotationKey();
 
   setLoadingText('Loading gene list...');
   const geneResp = await fetch('data/gene_list.json', NO_CACHE);
@@ -807,6 +815,28 @@ function colormapInterp(t) {
 // cell per layer cost ~26 MB per layer, and the single-sample payload was already
 // 73 MB against GitHub's 100 MB file limit. A string array is still accepted so an
 // older payload keeps working.
+// Pick the active layer: metadata.celltype_col if that layer really exists in BOTH
+// metadata.annotations and cells.json, else the first layer present in both. Checking
+// cells.json too matters because a declared layer with no array is the same crash.
+function resolveAnnotationKey() {
+  const anns = (metadata && metadata.annotations) ? Object.keys(metadata.annotations) : [];
+  const usable = anns.filter(k => Array.isArray(cellData[k]));
+  const declared = metadata && metadata.celltype_col;
+  if (declared && usable.includes(declared)) { currentAnnotation = declared; }
+  else if (usable.length) {
+    currentAnnotation = usable[0];
+    if (declared) console.warn(`celltype_col "${declared}" is not a usable layer; using "${usable[0]}".`);
+  } else if (Array.isArray(cellData.celltype)) { currentAnnotation = 'celltype'; }
+  else { throw new Error('cells.json carries no usable annotation array; re-run the export.'); }
+  DEFAULT_ANNOTATION = currentAnnotation;
+  // metadata.cell_types must agree with the chosen layer; switchAnnotation() does this
+  // on every later change, so do it once here for the initial layer too.
+  const a = metadata.annotations && metadata.annotations[currentAnnotation];
+  if (a && a.cell_types) { metadata.cell_types = a.cell_types; metadata.n_celltypes = a.n_celltypes; }
+}
+
+let DEFAULT_ANNOTATION = 'celltype';
+
 function annLevels(key) {
   const a = metadata.annotations && metadata.annotations[key];
   return (a && a.cell_types) || metadata.cell_types || [];
@@ -1878,7 +1908,7 @@ function updateHash(viewState) {
   // Annotation layer and label highlights, so a highlighted view is shareable.
   // Pasted cell-ID sets are deliberately NOT serialised — they can run to
   // thousands of IDs and would blow the URL length.
-  if (currentAnnotation !== 'celltype') params.set('ann', currentAnnotation);
+  if (currentAnnotation !== DEFAULT_ANNOTATION) params.set('ann', currentAnnotation);
   const hlKeys = Object.keys(highlightLabels);
   if (hlKeys.length) {
     params.set('hl', hlKeys.join('~'));
