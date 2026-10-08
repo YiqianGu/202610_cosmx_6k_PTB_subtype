@@ -43,6 +43,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .ct-ex:hover { color: #e6e6e6; }
 .ct-ex-leaf { visibility: hidden; cursor: default; }
 .ct-row[data-level="leaf"] { padding-left: 15px; }
+.ct-row[data-level="header"] { margin-top: 4px; }
+.ct-row[data-level="header"] .ct-name { font-weight: 600; }
+.ct-row[data-level="header"] + .ct-row[data-level="leaf"],
+.ct-row[data-level="leaf"] + .ct-row[data-level="leaf"] { padding-left: 24px; }
 .ct-row[data-level="parent"] .ct-name { font-weight: 600; }
 .ct-row:hover { background: rgba(255,255,255,0.05); }
 /* Individual transcript rows — same metrics as .ct-row, tighter and monospaced */
@@ -874,6 +878,10 @@ let hierLeafLevels = null; // leaf label strings (immutable)
 let hierParents = null;    // major label strings, export order
 let hierParentOf = null;   // leaf index -> parent index
 let hierExpanded = new Set();
+// An EXPANDED major stays on screen as a header row carrying the collapse
+// chevron. Without it the row you clicked to expand disappears -- replaced by
+// its own children -- and there is nothing left to click to collapse.
+let derivedHeaders = new Set();
 let lastViewState = null;
 
 function hierInfo() {
@@ -903,11 +911,17 @@ function rebuildDerived() {
   if (!hierInfo() || currentAnnotation !== hierKey) return;
   const leafToRow = new Int32Array(hierLeafLevels.length).fill(-1);
   const levels = [];
+  derivedHeaders = new Set();
   hierParents.forEach((pname, pi) => {
     const kids = [];
     for (let l = 0; l < hierParentOf.length; l++) if (hierParentOf[l] === pi) kids.push(l);
     // A single-subtype lineage's leaf IS its major, so expanding it is a no-op.
     if (hierExpanded.has(pname) && kids.length > 1) {
+      // Header row first: no leaf maps to it, so no cell resolves to it and it
+      // contributes 0 to every count. It exists to carry the collapse chevron
+      // and to cascade visibility over its children.
+      derivedHeaders.add(pname);
+      levels.push(pname);
       kids.forEach(l => { leafToRow[l] = levels.length; levels.push(hierLeafLevels[l]); });
     } else {
       const r = levels.length; levels.push(pname);
@@ -941,6 +955,24 @@ function hierChildCount(label) {
   return n;
 }
 function hierIsParentRow(label) { return hierInfo() ? hierParents.indexOf(label) >= 0 : false; }
+function hierIsHeaderRow(label) { return derivedHeaders.has(label); }
+function hierChildLabels(label) {
+  if (!hierInfo()) return [];
+  const pi = hierParents.indexOf(label);
+  if (pi < 0) return [];
+  const out = [];
+  for (let l = 0; l < hierParentOf.length; l++) if (hierParentOf[l] === pi) out.push(hierLeafLevels[l]);
+  return out;
+}
+// A header owns no cells, so its checkbox is only meaningful as a cascade over
+// the subtype rows beneath it.
+function setHeaderVisible(label, on) {
+  celltypeVisible[label] = on;
+  hierChildLabels(label).forEach(c => { celltypeVisible[c] = on; });
+  buildCelltypeUI();
+  rebuildHighlightIdx();
+  updateLayer();
+}
 
 // Default colours key off a FROZEN index (parents, then leaves) rather than the
 // row's position in the displayed list -- otherwise expanding one major silently
@@ -1495,6 +1527,11 @@ function buildCelltypeUI() {
     for (let i = 0; i < arr.length; i++) { const c = arr[i]; if (c >= 0 && c < lv.length) byCode[c]++; }
     for (let c = 0; c < lv.length; c++) if (byCode[c]) counts[lv[c]] = byCode[c];
   }
+  // A header row owns no cells of its own; show the total of its subtypes so a
+  // collapsed and an expanded major report the same number.
+  derivedHeaders.forEach(h => {
+    counts[h] = hierChildLabels(h).reduce((a, c) => a + (counts[c] || 0), 0);
+  });
 
   metadata.cell_types.forEach(ct => {
     const row = createCelltypeRow(ct, counts[ct] || 0);
@@ -1510,9 +1547,20 @@ function buildCelltypeUI() {
     host.dataset.exBound = '1';
     host.addEventListener('click', e => {
       const b = e.target.closest('.ct-ex');
-      if (!b || !b.dataset.expand) return;
-      e.stopPropagation();
-      setExpanded(b.dataset.expand, !hierExpanded.has(b.dataset.expand));
+      if (b && b.dataset.expand) {
+        e.stopPropagation();
+        setExpanded(b.dataset.expand, !hierIsHeaderRow(b.dataset.expand));
+        return;
+      }
+      // Header rows are built without per-element listeners, so their `genes`
+      // button is delegated here too.
+      const mk = e.target.closest('.ct-mk');
+      const hr = e.target.closest('.ct-row[data-level="header"]');
+      if (mk && hr) { e.stopPropagation(); showMarkers(hr.dataset.celltype); }
+    });
+    host.addEventListener('change', e => {
+      const t = e.target;
+      if (t.dataset && t.dataset.headerToggle) setHeaderVisible(t.dataset.headerToggle, t.checked);
     });
   });
 
@@ -1605,16 +1653,48 @@ function createCelltypeRow(ct, count) {
   // Expander. A single-subtype lineage's leaf IS its major, so expanding it
   // would redraw the same row -- no chevron there (the exporter skips those
   // lineages for the same reason).
-  const isP = hierIsParentRow(ct), kids = hierChildCount(ct);
-  row.dataset.level = hierInfo() ? (isP ? 'parent' : 'leaf') : 'flat';
+  const isP = hierIsParentRow(ct), kids = hierChildCount(ct), isHdr = hierIsHeaderRow(ct);
+  row.dataset.level = hierInfo() ? (isHdr ? 'header' : (isP ? 'parent' : 'leaf')) : 'flat';
   const ex = document.createElement('button');
   ex.className = 'ct-ex' + ((isP && kids > 1) ? '' : ' ct-ex-leaf');
   if (isP && kids > 1) {
-    ex.textContent = hierExpanded.has(ct) ? '\u25BE' : '\u25B8';
+    ex.textContent = isHdr ? '\u25BE' : '\u25B8';
     ex.dataset.expand = ct;
-    ex.title = (hierExpanded.has(ct) ? 'Collapse ' : 'Expand ') + ct + ' (' + kids + ' subtypes)';
+    ex.title = (isHdr ? 'Collapse ' : 'Expand ') + ct + ' (' + kids + ' subtypes)';
   } else { ex.disabled = true; }
   row.appendChild(ex);
+
+  // A header carries the chevron, a cascading checkbox, its name, the summed
+  // count and (if it has one) its marker list. No colour picker: its subtypes
+  // own their colours, and no highlight ring: which cells it would ring is
+  // ambiguous while it is expanded. Collapse it to get both back.
+  if (isHdr) {
+    const hcb = document.createElement('input');
+    hcb.type = 'checkbox';
+    hcb.checked = celltypeVisible[ct] !== false;
+    hcb.title = 'Show/hide every subtype of ' + ct;
+    hcb.dataset.headerToggle = ct;
+    row.appendChild(hcb);
+    const hl2 = document.createElement('span');
+    hl2.className = 'ct-label';
+    const hn = document.createElement('div');
+    hn.className = 'ct-name';
+    hn.textContent = ct;
+    hl2.appendChild(hn);
+    if (getMarkers(ct).length) {
+      const hmk = document.createElement('button');
+      hmk.className = 'ct-mk';
+      hmk.textContent = 'genes';
+      hmk.title = 'Show this label\u2019s top marker genes';
+      hl2.appendChild(hmk);
+    }
+    row.appendChild(hl2);
+    const hc = document.createElement('span');
+    hc.className = 'ct-count';
+    hc.textContent = count.toLocaleString();
+    row.appendChild(hc);
+    return row;
+  }
 
   const cb = document.createElement('input');
   cb.type = 'checkbox';
