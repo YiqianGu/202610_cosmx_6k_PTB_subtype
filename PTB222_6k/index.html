@@ -988,29 +988,51 @@ function defaultColorFor(ct) {
 }
 
 // Expand or collapse one major. A strict subset of switchAnnotation()'s work:
-// it must NOT reset colours or visibility, and new child rows inherit the
-// parent's visibility so expanding a hidden major does not un-hide 13 rows.
+// it must NOT reset colours, and a hidden major must never put visible children
+// on screen.
 function setExpanded(pname, on) {
   if (!hierInfo()) return;
   if (on) hierExpanded.add(pname); else hierExpanded.delete(pname);
-  const parentVis = celltypeVisible[pname];
+  applyExpansion([pname]);
+}
+function setAllExpanded(on) {
+  if (!hierInfo()) return;
+  // Pass the REAL parents. The previous version delegated with setExpanded('', false),
+  // so the visibility rule read celltypeVisible[''] -- undefined -- and every new child
+  // became visible: "expand all" un-hid the subtypes of every major the user had hidden.
+  const touched = hierParents.filter(p => hierChildCount(p) > 1);
+  hierExpanded = on ? new Set(touched) : new Set();
+  applyExpansion(touched);
+}
+// Re-derive the mixed level list, then settle colours and visibility for the rows
+// that now exist.
+//
+// VISIBILITY RULE, and why it is not just "fill in the blanks". The old code only
+// touched a child whose visibility was undefined, which is true just once -- the
+// first time its parent is expanded. After expand, collapse, untick the collapsed
+// major, expand again, every child kept the `true` it was given in round one and
+// rendered while its own header read unchecked: the legend and the canvas
+// disagreed. So a HIDDEN parent now forces all of its children hidden every time,
+// while a visible parent leaves existing per-child choices alone (unticking one
+// subtype and collapsing must not silently re-tick it).
+function applyExpansion(parents) {
   rebuildDerived();
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem('spatial_viewer_colors') || '{}'); } catch (e) { saved = {}; }
   metadata.cell_types.forEach(ct => {
     if (celltypeColors[ct] === undefined) celltypeColors[ct] = saved[ct] || defaultColorFor(ct);
-    if (celltypeVisible[ct] === undefined) celltypeVisible[ct] = (parentVis !== false);
+    if (celltypeVisible[ct] === undefined) celltypeVisible[ct] = true;
+  });
+  parents.forEach(p => {
+    if (!hierExpanded.has(p)) return;
+    const vis = celltypeVisible[p] !== false;
+    hierChildLabels(p).forEach(c => { if (!vis) celltypeVisible[c] = false; });
   });
   buildCelltypeUI();
   rebuildHighlightIdx();
   updateSelectionSummary();
   updateLayer();
   updateHash(lastViewState);
-}
-function setAllExpanded(on) {
-  if (!hierInfo()) return;
-  hierExpanded = on ? new Set(hierParents.filter(p => hierChildCount(p) > 1)) : new Set();
-  setExpanded('', false);
 }
 
 function annLevels(key) {
