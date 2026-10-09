@@ -15,7 +15,7 @@
   },
   "celltype_col": "cell_type",
   "schema": 2,
-  "payload_version": "20261008160449",
+  "payload_version": "20261008170315",
   "annotations": {
     "cell_type": {
       "label": "Cell type (major -> subtype)",
