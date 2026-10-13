@@ -863,18 +863,25 @@ function resolveAnnotationKey() {
 
 let DEFAULT_ANNOTATION = 'celltype';
 
-// ---- Hierarchical "Cell type" layer -------------------------------------
-// The exported `cell_type` layer is a FLAT leaf vector (subtypes, plus A02's
-// V2 label) carrying a parent map. The hierarchy is computed in the browser:
-// on expand/collapse we rewrite cellData.cell_type and that layer's
-// cell_types IN PLACE from the stashed leaf codes. Doing it that way means
-// getCelltype, rebuildColors, rebuildHighlightIdx, buildCelltypeUI's
-// histogram, getTooltipInfo, updateSelectionSummary, toggleAll and
+// ---- Hierarchical "Cell type" layers ------------------------------------
+// An exported hierarchical layer (`cell_type`, `cell_type_a06`) is a FLAT leaf
+// vector carrying a parent map. The hierarchy is computed in the browser: on
+// expand/collapse we rewrite that layer's cellData array and cell_types IN
+// PLACE from the stashed leaf codes. Doing it that way means getCelltype,
+// rebuildColors, rebuildHighlightIdx, buildCelltypeUI's histogram,
+// getTooltipInfo, updateSelectionSummary, toggleAll and
 // resolveAnnotationKey's Array.isArray() gate all keep working untouched --
 // a virtual key resolved only inside getCelltype() would leave
 // buildCelltypeUI reading `undefined` and throw, which is the exact failure
 // this viewer already shipped once.
-let hierKey = null;        // which layer is hierarchical ('cell_type')
+//
+// SEVERAL layers may be hierarchical. Each one's immutable arrays are stashed
+// in hierLayers at load (BEFORE any rewrite); the hier* globals below always
+// describe the ACTIVE layer, pointed there by hierActivate(). Switching
+// layers collapses the newly active one back to its majors (the pre-existing
+// behaviour, now per layer).
+let hierLayers = {};       // key -> {leafCodes, leafLevels, parents, parentOf}
+let hierKey = null;        // the ACTIVE hierarchical layer, or null
 let hierLeafCodes = null;  // Int32Array: cell -> leaf index (immutable)
 let hierLeafLevels = null; // leaf label strings (immutable)
 let hierParents = null;    // major label strings, export order
@@ -892,19 +899,30 @@ function hierInfo() {
   return (a && a.parents && a.parent_of) ? a : null;
 }
 
-// Stash the immutable leaf arrays once, before anything reads the layer.
+// Stash the immutable leaf arrays of EVERY hierarchical layer once, before
+// anything rewrites them, then activate the current layer.
 function hierInit() {
-  hierKey = null;
+  hierLayers = {};
   const anns = (metadata && metadata.annotations) ? metadata.annotations : {};
   for (const k of Object.keys(anns)) {
-    if (anns[k].parents && anns[k].parent_of && Array.isArray(cellData[k])) { hierKey = k; break; }
+    if (anns[k].parents && anns[k].parent_of && Array.isArray(cellData[k])) {
+      hierLayers[k] = { leafLevels: anns[k].cell_types.slice(),
+                        parents:    anns[k].parents.slice(),
+                        parentOf:   Int32Array.from(anns[k].parent_of),
+                        leafCodes:  Int32Array.from(cellData[k]) };
+    }
   }
-  if (!hierKey) return;
-  const a = anns[hierKey];
-  hierLeafLevels = a.cell_types.slice();
-  hierParents = a.parents.slice();
-  hierParentOf = Int32Array.from(a.parent_of);
-  hierLeafCodes = Int32Array.from(cellData[hierKey]);
+  hierActivate(currentAnnotation);
+}
+
+// Point the hier* globals at one layer's stash (or none), collapsed to majors.
+function hierActivate(key) {
+  const e = hierLayers[key];
+  hierKey        = e ? key : null;
+  hierLeafLevels = e ? e.leafLevels : null;
+  hierParents    = e ? e.parents    : null;
+  hierParentOf   = e ? e.parentOf   : null;
+  hierLeafCodes  = e ? e.leafCodes  : null;
   hierExpanded = new Set();
 }
 
@@ -1193,9 +1211,9 @@ function switchAnnotation(key) {
     metadata.cell_types = metadata.annotations[key].cell_types;
     metadata.n_celltypes = metadata.annotations[key].n_celltypes;
   }
-  // Collapse to majors on every layer change, and rebuild BEFORE the colour
-  // init below reads metadata.cell_types.
-  hierExpanded = new Set();
+  // Activate this layer's hierarchy (if it has one), collapsed to majors, and
+  // rebuild BEFORE the colour init below reads metadata.cell_types.
+  hierActivate(key);
   rebuildDerived();
   // Re-initialize colors for new cell types
   const saved = localStorage.getItem('spatial_viewer_colors');
@@ -1485,9 +1503,12 @@ function getTooltipInfo({index, object}) {
   const hp = hierParentNameOf(ct);
   if (hp && hp !== ct) html += `<div class="tt-label">Major</div><div class="tt-value">${hp}</div>`;
   // The round-2 call for this cell, so a V2 row can be read against it without
-  // leaving the viewer. cellData.subtype is a tooltip-only array (not a layer).
-  if (hierInfo() && Array.isArray(cellData.subtype)) {
-    const sv = hierLeafLevels[cellData.subtype[cellIdx]];
+  // leaving the viewer. cellData.subtype is a tooltip-only array (not a layer)
+  // and is coded against the DECLARED cell-type layer's original leaf levels --
+  // decode against that stash, never the active layer's (their leaf lists differ).
+  const baseHier = hierLayers[(metadata && metadata.celltype_col) || 'cell_type'];
+  if (baseHier && Array.isArray(cellData.subtype)) {
+    const sv = baseHier.leafLevels[cellData.subtype[cellIdx]];
     if (sv && sv !== ct) html += `<div class="tt-label">Round-2 subtype</div><div class="tt-value">${sv}</div>`;
   }
 
