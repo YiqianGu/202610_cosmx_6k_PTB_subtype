@@ -20,8 +20,10 @@
     leave the others collapsed &mdash; so you can show <i>TREM2&#8314; macrophages</i> at subtype level
     beside <i>Fibroblast</i> at major level, in one view. <code>Expand all</code> /
     <code>Collapse all</code> do every row at once. The dropdown also holds
-    <b>Cell type + antigen activation T_v2</b> (the 959 A06 screen candidates as one row under
-    T cell, everything else keeping its round-2 subtype), <b>Activation</b> (just
+    <b>Cell type (T cell recovered)</b> &mdash; on PTB&nbsp;24.3 every CD3-protein-positive cell
+    (65,570) moves to a new major, <i>T cell recovered</i>, expandable into the A06 screen
+    candidates (<i>antigen activation T_v2</i>) and the rest; on PTB&nbsp;22.2 (no CD3 channel)
+    only the 543 candidates move, as one row under T cell &mdash; plus <b>Activation</b> (just
     the two populations of interest), transfer confidence, and sample.
     Each legend row has a colour picker — your choices persist in the browser — and a
     <code>genes</code> button listing that label&rsquo;s <b>top 20 marker genes</b>; click a gene to
@@ -45,12 +47,15 @@
     <i>below</i> chance &mdash; the two slides&rsquo; V2 numbers are not comparable. The round-2
     <code>subtype</code> call is untouched and remains the annotation of record; hover any cell to
     see both.
-    <br><br><b>The <code>antigen activation T_v2</code> row is a SCREEN CALL, not a cell type.</b>
-    It is A06&rsquo;s Flex-calibrated screen (CD3 gate &rarr; CD4 gate &rarr; double-high
-    activation + Th1 module test), which on the reference catches the <b>activated granuloma
-    effector family</b> (TC9 + CD30&#8314; effector + IL26&#8314; Th17.1-like; family precision 0.89),
-    not TC9 alone. On PTB&nbsp;24.3 the gate is CD3 <i>protein</i>; PTB&nbsp;22.2 has no CD3 channel,
-    so its gate is RNA &mdash; the two slides&rsquo; candidate counts are not comparable. Candidates
-    include mixed segmentation units by design; the tier of every cell is in A06&rsquo;s
-    candidate table.</div>
+    <br><br><b>The <code>T cell recovered</code> rows are SCREEN CALLS, not cell types.</b>
+    On PTB&nbsp;24.3, <i>T cell recovered</i> holds every cell above A06&rsquo;s frozen CD3-protein
+    cutoff (the level only 1% of hypoxic SPP1&#43; macrophages exceed) &mdash; potential T cells
+    whatever the transfer called them (only ~29% were A01 T cells; ~41% of the rest carry the
+    Proliferating label, which hides T cells). Its <i>antigen activation T_v2</i> leaf is A06&rsquo;s
+    Flex-calibrated screen (CD3 gate &rarr; CD4 gate &rarr; double-high activation + Th1 module
+    test), which on the reference catches the <b>activated granuloma effector family</b>
+    (TC9 + CD30&#8314; effector + IL26&#8314; Th17.1-like; family precision 0.89), not TC9 alone.
+    PTB&nbsp;22.2 has no CD3 channel, so only its 543 candidates move (RNA-gated, under T cell)
+    &mdash; the two slides&rsquo; counts are not comparable. Hover any cell for its round-2
+    subtype; per-cell tiers are in A06&rsquo;s candidate table.</div>
     </body></html>

@@ -23,15 +23,20 @@ types, then 60 subtypes restricted within each lineage.
   Note an expanded Myeloid is 13 rows and 9 collapsed majors sit beside it, so a
   mixed legend runs to ~22 rows — past the point where any palette separates
   categories, which is what the colour pickers are for.
-- **Cell type + antigen activation T_v2 (A06)** — the same hierarchical layer, but
-  with the **959 A06 screen candidates** shown as one row (`antigen activation T_v2`)
-  under T cell while every other cell keeps its round-2 subtype. A06's screen is
-  Flex-calibrated (CD3 gate → CD4 gate → double-high activation + Th1 module test)
-  and catches the **activated granuloma effector family** (TC9 + CD30⁺ effector +
-  IL26⁺ Th17.1-like; family precision 0.89 on the reference), **not TC9 alone**.
-  PTB 24.3 is gated on CD3 *protein*; PTB 22.2 has no CD3 channel and is gated on
-  RNA — the two slides' candidate counts are not comparable. Candidates include
-  mixed segmentation units by design; per-cell tiers are in A06's candidate table.
+- **Cell type (T cell recovered)** — the same hierarchical layer, rebuilt around
+  A06's screen. On **PTB 24.3**, every cell above the frozen CD3-*protein* cutoff
+  (65,570 cells — the level only 1% of hypoxic SPP1+ macrophages exceed) moves to a
+  new major, **T cell recovered**: potential T cells whatever the transfer called
+  them (only ~29% were A01 T cells; the Proliferating label, which hides T cells,
+  contributes 14%). Expand it for its two leaves: **antigen activation T_v2** (the
+  A06 screen candidates) and **T cell recovered (other)** (CD3⁺ but failed the CD4
+  gate, the double-high test, or dropped as clear CD8). On **PTB 22.2** (no CD3
+  channel) only the 543 RNA-gated candidates move, as one leaf under the existing
+  T cell major — the two slides' counts are not comparable. The A06 screen is
+  Flex-calibrated and catches the **activated granuloma effector family**
+  (TC9 + CD30⁺ effector + IL26⁺ Th17.1-like; family precision 0.89), **not TC9
+  alone**. Hover any cell for its round-2 subtype; per-cell tiers are in A06's
+  candidate table.
 - **Annotation Layer** also holds **Activation** (just the two populations of
   interest), transfer confidence, and sample.
 - **Colour pickers** on every legend row; your choices persist in the browser.
