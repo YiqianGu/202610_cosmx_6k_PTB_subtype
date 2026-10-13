@@ -23,6 +23,15 @@ types, then 60 subtypes restricted within each lineage.
   Note an expanded Myeloid is 13 rows and 9 collapsed majors sit beside it, so a
   mixed legend runs to ~22 rows — past the point where any palette separates
   categories, which is what the colour pickers are for.
+- **Cell type + antigen activation T_v2 (A06)** — the same hierarchical layer, but
+  with the **959 A06 screen candidates** shown as one row (`antigen activation T_v2`)
+  under T cell while every other cell keeps its round-2 subtype. A06's screen is
+  Flex-calibrated (CD3 gate → CD4 gate → double-high activation + Th1 module test)
+  and catches the **activated granuloma effector family** (TC9 + CD30⁺ effector +
+  IL26⁺ Th17.1-like; family precision 0.89 on the reference), **not TC9 alone**.
+  PTB 24.3 is gated on CD3 *protein*; PTB 22.2 has no CD3 channel and is gated on
+  RNA — the two slides' candidate counts are not comparable. Candidates include
+  mixed segmentation units by design; per-cell tiers are in A06's candidate table.
 - **Annotation Layer** also holds **Activation** (just the two populations of
   interest), transfer confidence, and sample.
 - **Colour pickers** on every legend row; your choices persist in the browser.
