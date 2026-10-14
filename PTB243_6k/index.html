@@ -533,9 +533,10 @@ const DEFAULT_PALETTE = [
 ];
 
 // Robert's picked colours (screenshot 2026-10-14, Display-P3 -> sRGB converted).
-// These labels get a FIXED default instead of a frozen-index palette slot, so a
-// fresh browser opens on his scheme. A colour saved in localStorage still wins,
-// so anyone who customised keeps their own picks. ⁺ is the superscript
+// These labels get a FIXED default instead of a frozen-index palette slot, and
+// they also OVERRIDE colours saved in localStorage (per Qian, 2026-10-14), so
+// every browser opens on his scheme. Recolouring one in the UI still works for
+// the session but resets on the next load. ⁺ is the superscript
 // plus the subtype labels carry -- kept as an escape so the file stays ASCII.
 const PINNED_DEFAULT_COLORS = {
   'B cell':                                            [0, 255, 0],
@@ -727,7 +728,7 @@ function loadColorPreferences() {
   const savedObj = saved ? JSON.parse(saved) : {};
 
   metadata.cell_types.forEach((ct, i) => {
-    if (savedObj[ct]) {
+    if (savedObj[ct] && !PINNED_DEFAULT_COLORS[ct]) {
       celltypeColors[ct] = savedObj[ct];
     } else {
       celltypeColors[ct] = defaultColorFor(ct);
@@ -1059,7 +1060,7 @@ function applyExpansion(parents) {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem('spatial_viewer_colors') || '{}'); } catch (e) { saved = {}; }
   metadata.cell_types.forEach(ct => {
-    if (celltypeColors[ct] === undefined) celltypeColors[ct] = saved[ct] || defaultColorFor(ct);
+    if (celltypeColors[ct] === undefined) celltypeColors[ct] = PINNED_DEFAULT_COLORS[ct] || saved[ct] || defaultColorFor(ct);
     if (celltypeVisible[ct] === undefined) celltypeVisible[ct] = true;
   });
   parents.forEach(p => {
@@ -1240,7 +1241,7 @@ function switchAnnotation(key) {
   celltypeColors = {};
   celltypeVisible = {};
   metadata.cell_types.forEach((ct, i) => {
-    celltypeColors[ct] = savedObj[ct] || defaultColorFor(ct);
+    celltypeColors[ct] = PINNED_DEFAULT_COLORS[ct] || savedObj[ct] || defaultColorFor(ct);
     celltypeVisible[ct] = true;
   });
   // Rebuild UI and re-render
@@ -2291,7 +2292,7 @@ function restoreFromHash() {
       let saved = {};
       try { saved = JSON.parse(localStorage.getItem('spatial_viewer_colors') || '{}'); } catch (e) { saved = {}; }
       metadata.cell_types.forEach(ct => {
-        if (celltypeColors[ct] === undefined) celltypeColors[ct] = saved[ct] || defaultColorFor(ct);
+        if (celltypeColors[ct] === undefined) celltypeColors[ct] = PINNED_DEFAULT_COLORS[ct] || saved[ct] || defaultColorFor(ct);
         if (celltypeVisible[ct] === undefined) celltypeVisible[ct] = true;
       });
       buildCelltypeUI(); updateSelectionSummary(); updateLayer();
