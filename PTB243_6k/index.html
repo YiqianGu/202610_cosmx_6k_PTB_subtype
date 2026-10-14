@@ -532,6 +532,24 @@ const DEFAULT_PALETTE = [
   [147, 112, 219], [60, 179, 113],  [255, 165, 0],   [106, 90, 205]
 ];
 
+// Robert's picked colours (screenshot 2026-10-14, Display-P3 -> sRGB converted).
+// These labels get a FIXED default instead of a frozen-index palette slot, so a
+// fresh browser opens on his scheme. A colour saved in localStorage still wins,
+// so anyone who customised keeps their own picks. ⁺ is the superscript
+// plus the subtype labels carry -- kept as an escape so the file stays ASCII.
+const PINNED_DEFAULT_COLORS = {
+  'B cell':                                            [0, 255, 0],
+  'B cell (MS4A1+, naive/memory mixed)':               [0, 255, 0],
+  'AT2 (NAPSA+, interferon/acute-phase inflammatory)': [195, 188, 196],
+  'AT2 (SFTPC+, NF-kB/AP-1 inflammatory stress)':      [195, 188, 196],
+  'AT2 (SFTPC+)':                                      [195, 188, 196],
+  'hypoxic SPP1+ macrophages':                         [64, 71, 191],
+  'SPP1⁺ macrophages':                            [64, 71, 191],
+  'TREM2⁺ macrophages':                           [255, 0, 0],
+  'antigen activation T_v2':                           [255, 255, 0],
+  'T cell recovered (other)':                          [255, 128, 0]
+};
+
 // Colormaps (10 stops each for interpolation)
 const COLORMAPS = {
   viridis: [
@@ -998,6 +1016,7 @@ function setHeaderVisible(label, on) {
 // row's position in the displayed list -- otherwise expanding one major silently
 // recolours every untouched row below it.
 function defaultColorFor(ct) {
+  if (PINNED_DEFAULT_COLORS[ct]) return PINNED_DEFAULT_COLORS[ct];
   let k = -1;
   if (hierInfo()) {
     k = hierParents.indexOf(ct);
