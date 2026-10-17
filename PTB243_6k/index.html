@@ -548,7 +548,9 @@ const PINNED_DEFAULT_COLORS = {
   'SPP1⁺ macrophages':                            [64, 71, 191],
   'TREM2⁺ macrophages':                           [255, 0, 0],
   'antigen activation T_v2':                           [255, 255, 0],
-  'T cell recovered (other)':                          [255, 128, 0]
+  'T cell recovered (other)':                          [255, 128, 0],
+  'antigen activation T (A08)':                        [255, 255, 0],
+  'T cell recovered (other, A08)':                     [255, 128, 0]
 };
 
 // Colormaps (10 stops each for interpolation)
@@ -883,7 +885,7 @@ function resolveAnnotationKey() {
 let DEFAULT_ANNOTATION = 'celltype';
 
 // ---- Hierarchical "Cell type" layers ------------------------------------
-// An exported hierarchical layer (`cell_type`, `cell_type_a06`) is a FLAT leaf
+// An exported hierarchical layer (`cell_type`, `cell_type_a06`, `cell_type_a08`) is a FLAT leaf
 // vector carrying a parent map. The hierarchy is computed in the browser: on
 // expand/collapse we rewrite that layer's cellData array and cell_types IN
 // PLACE from the stashed leaf codes. Doing it that way means getCelltype,
