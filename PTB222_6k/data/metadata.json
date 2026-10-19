@@ -15,7 +15,7 @@
   },
   "celltype_col": "cell_type",
   "schema": 2,
-  "payload_version": "20261016172514",
+  "payload_version": "20261018194838",
   "annotations": {
     "cell_type": {
       "label": "Cell type (major -> subtype)",
@@ -440,6 +440,11 @@
       "annotation": "CD3-protein-positive but did not pass the A08 screen (failed the CD4 gate or the double-high module test, or was dropped as clear CD8)",
       "n_cells": 65123,
       "markers": ["CD3E", "CD3D", "CD2", "TRAC"]
+    },
+    "antigen activation T": {
+      "annotation": "E04 (exploratory): PTB 24.3 cells A01 called T cell that sit AT/BELOW the CD3-protein cutoff yet pass A08's CD4 gate + double-high module test (A08's own null sets) - RNA-selected, NOT a transferred label; see E04_cd3neg_t_screen",
+      "n_cells": 174,
+      "markers": ["EGR2", "NR4A3", "NR4A1", "TNF", "CCL3", "CCL4", "KDM6B", "IFNG", "IRF4", "IRF8", "RNF19A", "TNFSF14", "SLC1A5", "MAP2K3", "OSBPL3", "GRAMD1B", "TFRC", "GBP2", "ZFP36L1", "BATF"]
     }
   }
 }
